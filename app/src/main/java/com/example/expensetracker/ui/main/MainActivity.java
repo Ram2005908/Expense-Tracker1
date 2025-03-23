@@ -17,6 +17,7 @@ import com.example.expensetracker.model.Expense;
 import com.example.expensetracker.ui.auth.LoginActivity;
 import com.example.expensetracker.ui.expense.AddExpenseActivity;
 import com.example.expensetracker.ui.expense.EditExpenseActivity;
+import com.example.expensetracker.ui.settings.SettingsActivity;
 import com.example.expensetracker.viewmodel.MainViewModel;
 import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
@@ -135,6 +136,10 @@ public class MainActivity extends AppCompatActivity implements ExpenseAdapter.On
             FirebaseAuth.getInstance().signOut();
             startActivity(new Intent(this, LoginActivity.class));
             finish();
+            return true;
+        }
+        if (item.getItemId() == R.id.action_settings) {
+            startActivity(new Intent(this, SettingsActivity.class));
             return true;
         }
         return super.onOptionsItemSelected(item);
