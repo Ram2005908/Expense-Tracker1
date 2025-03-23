@@ -8,15 +8,22 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.expensetracker.databinding.ActivityRegisterBinding;
-import com.example.expensetracker.model.User;
 import com.example.expensetracker.ui.main.MainActivity;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException;
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
+import com.google.firebase.auth.FirebaseAuthUserCollisionException;
 import com.google.firebase.firestore.FirebaseFirestore;
+import android.util.Log;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class RegisterActivity extends AppCompatActivity {
+    private static final String TAG = "RegisterActivity";
     private ActivityRegisterBinding binding;
     private FirebaseAuth auth;
-    private FirebaseFirestore db;
+    private FirebaseFirestore firestore;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -25,54 +32,116 @@ public class RegisterActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         auth = FirebaseAuth.getInstance();
-        db = FirebaseFirestore.getInstance();
+        firestore = FirebaseFirestore.getInstance();
 
-        binding.registerButton.setOnClickListener(v -> performRegistration());
+        setupClickListeners();
     }
 
-    private void performRegistration() {
-        String name = binding.nameEditText.getText().toString().trim();
+    private void setupClickListeners() {
+        binding.registerButton.setOnClickListener(v -> registerUser());
+        binding.loginLink.setOnClickListener(v -> finish());
+    }
+
+    private void registerUser() {
         String email = binding.emailEditText.getText().toString().trim();
         String password = binding.passwordEditText.getText().toString().trim();
+        String confirmPassword = binding.confirmPasswordEditText.getText().toString().trim();
 
-        if (name.isEmpty() || email.isEmpty() || password.isEmpty()) {
-            Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
+        // Add debug logging
+        Log.d(TAG, "Attempting to register with email: " + email);
+
+        // Validate input
+        if (email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty()) {
+            Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (!password.equals(confirmPassword)) {
+            Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (password.length() < 6) {
+            Toast.makeText(this, "Password must be at least 6 characters", Toast.LENGTH_SHORT).show();
             return;
         }
 
         binding.progressBar.setVisibility(View.VISIBLE);
+        binding.registerButton.setEnabled(false);
 
+        // Create user with email and password
+        Log.d(TAG, "Starting Firebase authentication...");
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener(this, task -> {
                 if (task.isSuccessful()) {
-                    String uid = auth.getCurrentUser().getUid();
-                    User user = new User(uid, email);
-                    user.setDisplayName(name);
+                    Log.d(TAG, "createUserWithEmail:success");
+                    String userId = auth.getCurrentUser().getUid();
+                    Log.d(TAG, "Created user with ID: " + userId);
 
-                    // Save user to Firestore
-                    db.collection("users").document(uid)
+                    // Create user document in Firestore
+                    Map<String, Object> user = new HashMap<>();
+                    user.put("email", email);
+                    user.put("monthlyBudget", 0.0);
+                    user.put("notificationsEnabled", true);
+                    user.put("createdAt", System.currentTimeMillis());
+
+                    Log.d(TAG, "Creating Firestore document for user...");
+                    firestore.collection("users")
+                        .document(userId)
                         .set(user)
                         .addOnSuccessListener(aVoid -> {
-                            startMainActivity();
-                            finish();
+                            Log.d(TAG, "User profile created successfully");
+                            // Sign out the user after registration
+                            auth.signOut();
+                            Toast.makeText(RegisterActivity.this, 
+                                "Registration successful! Please login.", 
+                                Toast.LENGTH_LONG).show();
+                            finish(); // This will go back to LoginActivity
                         })
                         .addOnFailureListener(e -> {
+                            Log.e(TAG, "Error creating user profile", e);
+                            // Sign out if profile creation fails
+                            auth.signOut();
                             binding.progressBar.setVisibility(View.GONE);
+                            binding.registerButton.setEnabled(true);
                             Toast.makeText(RegisterActivity.this, 
-                                "Error creating user profile", Toast.LENGTH_SHORT).show();
+                                "Failed to create user profile: " + e.getMessage(), 
+                                Toast.LENGTH_LONG).show();
                         });
                 } else {
+                    Exception exception = task.getException();
+                    Log.e(TAG, "createUserWithEmail:failure", exception);
+                    
                     binding.progressBar.setVisibility(View.GONE);
-                    Toast.makeText(RegisterActivity.this, 
-                        "Registration failed: " + task.getException().getMessage(), 
-                        Toast.LENGTH_SHORT).show();
-                }
-            });
-    }
+                    binding.registerButton.setEnabled(true);
 
-    private void startMainActivity() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
+                    String message;
+                    if (exception != null) {
+                        if (exception instanceof FirebaseAuthWeakPasswordException) {
+                            message = "Password is too weak";
+                        } else if (exception instanceof FirebaseAuthInvalidCredentialsException) {
+                            message = "Invalid email format";
+                        } else if (exception instanceof FirebaseAuthUserCollisionException) {
+                            message = "Email already in use";
+                        } else {
+                            message = "Registration failed: " + exception.getMessage();
+                            Log.e(TAG, "Detailed error: ", exception);
+                        }
+                    } else {
+                        message = "Registration failed";
+                        Log.e(TAG, "Unknown registration error");
+                    }
+
+                    Toast.makeText(RegisterActivity.this, message, Toast.LENGTH_LONG).show();
+                }
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Registration process failed", e);
+                binding.progressBar.setVisibility(View.GONE);
+                binding.registerButton.setEnabled(true);
+                Toast.makeText(RegisterActivity.this, 
+                    "Registration failed: " + e.getMessage(), 
+                    Toast.LENGTH_LONG).show();
+            });
     }
 } 

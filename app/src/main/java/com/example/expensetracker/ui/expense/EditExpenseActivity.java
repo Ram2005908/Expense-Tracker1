@@ -11,18 +11,18 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.example.expensetracker.R;
 import com.example.expensetracker.databinding.ActivityEditExpenseBinding;
 import com.example.expensetracker.model.Expense;
-import com.example.expensetracker.viewmodel.EditExpenseViewModel;
+import com.example.expensetracker.viewmodel.ExpenseViewModel;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.Locale;
 
 public class EditExpenseActivity extends AppCompatActivity {
     private ActivityEditExpenseBinding binding;
-    private EditExpenseViewModel viewModel;
+    private ExpenseViewModel viewModel;
     private Calendar calendar;
     private SimpleDateFormat dateFormat;
     private String expenseId;
@@ -38,93 +38,80 @@ public class EditExpenseActivity extends AppCompatActivity {
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setTitle("Edit Expense");
 
-        expenseId = getIntent().getStringExtra("expense_id");
-        if (expenseId == null) {
-            Toast.makeText(this, "Error loading expense", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
-        viewModel = new ViewModelProvider(this).get(EditExpenseViewModel.class);
         calendar = Calendar.getInstance();
         dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
 
-        setupViews();
-        setupObservers();
-        viewModel.loadExpense(expenseId);
+        setupSpinner();
+        setupClickListeners();
+        setupViewModel();
     }
 
-    private void setupViews() {
-        // Setup category spinner
-        ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(
-            this,
-            android.R.layout.simple_dropdown_item_1line,
-            viewModel.getCategories()
-        );
-        binding.categorySpinner.setAdapter(categoryAdapter);
+    private void setupSpinner() {
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.expense_categories, android.R.layout.simple_dropdown_item_1line);
+        binding.categorySpinner.setAdapter(adapter);
+    }
 
-        // Setup date picker
-        binding.dateEditText.setOnClickListener(v -> showDatePicker());
-
-        // Setup buttons
+    private void setupClickListeners() {
+        binding.dateButton.setOnClickListener(v -> showDatePicker());
+        
         binding.updateButton.setOnClickListener(v -> updateExpense());
         binding.deleteButton.setOnClickListener(v -> confirmDelete());
     }
 
-    private void setupObservers() {
-        viewModel.getExpense().observe(this, expense -> {
-            if (expense != null) {
-                currentExpense = expense;
-                binding.amountEditText.setText(String.valueOf(expense.getAmount()));
-                binding.categorySpinner.setText(expense.getCategory());
-                binding.descriptionEditText.setText(expense.getDescription());
-                calendar.setTime(expense.getDate());
-                binding.dateEditText.setText(dateFormat.format(calendar.getTime()));
-            }
-        });
+    private void setupViewModel() {
+        viewModel = new ViewModelProvider(this).get(ExpenseViewModel.class);
+        
+        expenseId = getIntent().getStringExtra("expense_id");
+        if (expenseId != null) {
+            viewModel.getExpense(expenseId).observe(this, this::populateExpense);
+        }
+    }
 
-        viewModel.getOperationSuccessful().observe(this, success -> {
-            if (success) {
-                finish();
-            }
-        });
+    private void populateExpense(Expense expense) {
+        if (expense != null) {
+            currentExpense = expense;
+            binding.amountEditText.setText(String.format(Locale.getDefault(), "%.2f", expense.getAmount()));
+            binding.categorySpinner.setText(expense.getCategory());
+            binding.descriptionEditText.setText(expense.getDescription());
+            calendar.setTime(expense.getDate());
+            updateDateButtonText();
+        }
     }
 
     private void showDatePicker() {
-        new DatePickerDialog(
-            this,
-            (view, year, month, dayOfMonth) -> {
-                calendar.set(Calendar.YEAR, year);
-                calendar.set(Calendar.MONTH, month);
-                calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
-                binding.dateEditText.setText(dateFormat.format(calendar.getTime()));
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        ).show();
+        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+            calendar.set(Calendar.YEAR, year);
+            calendar.set(Calendar.MONTH, month);
+            calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+            updateDateButtonText();
+        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH),
+           calendar.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private void updateDateButtonText() {
+        binding.dateButton.setText(dateFormat.format(calendar.getTime()));
     }
 
     private void updateExpense() {
-        String amountStr = binding.amountEditText.getText().toString();
+        if (!validateInput()) return;
+
+        binding.progressBar.setVisibility(View.VISIBLE);
+        
+        double amount = Double.parseDouble(binding.amountEditText.getText().toString());
         String category = binding.categorySpinner.getText().toString();
         String description = binding.descriptionEditText.getText().toString();
-        Date date = calendar.getTime();
 
-        if (amountStr.isEmpty() || category.isEmpty()) {
-            Toast.makeText(this, "Please fill in all required fields", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        try {
-            double amount = Double.parseDouble(amountStr);
-            binding.progressBar.setVisibility(View.VISIBLE);
-            binding.updateButton.setEnabled(false);
-            binding.deleteButton.setEnabled(false);
-            viewModel.updateExpense(expenseId, amount, category, description, date);
-        } catch (NumberFormatException e) {
-            Toast.makeText(this, "Please enter a valid amount", Toast.LENGTH_SHORT).show();
-        }
+        viewModel.updateExpense(expenseId, amount, category, description, calendar.getTime())
+            .addOnSuccessListener(aVoid -> {
+                Toast.makeText(this, "Expense updated successfully", Toast.LENGTH_SHORT).show();
+                finish();
+            })
+            .addOnFailureListener(e -> {
+                binding.progressBar.setVisibility(View.GONE);
+                Toast.makeText(this, "Failed to update expense: " + e.getMessage(),
+                    Toast.LENGTH_SHORT).show();
+            });
     }
 
     private void confirmDelete() {
@@ -139,6 +126,22 @@ public class EditExpenseActivity extends AppCompatActivity {
             })
             .setNegativeButton("Cancel", null)
             .show();
+    }
+
+    private boolean validateInput() {
+        if (binding.amountEditText.getText().toString().trim().isEmpty()) {
+            binding.amountEditText.setError("Amount is required");
+            return false;
+        }
+        if (binding.categorySpinner.getText().toString().trim().isEmpty()) {
+            Toast.makeText(this, "Please select a category", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        if (binding.descriptionEditText.getText().toString().trim().isEmpty()) {
+            binding.descriptionEditText.setError("Description is required");
+            return false;
+        }
+        return true;
     }
 
     @Override

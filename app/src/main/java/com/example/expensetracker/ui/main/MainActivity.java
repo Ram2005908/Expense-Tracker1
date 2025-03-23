@@ -24,6 +24,17 @@ import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
 import com.github.mikephil.charting.utils.ColorTemplate;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.os.Build;
+import androidx.core.app.NotificationCompat;
+import android.graphics.Color;
+import android.graphics.ColorStateList;
+import java.util.Locale;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,13 +45,18 @@ public class MainActivity extends AppCompatActivity implements ExpenseAdapter.On
     private ActivityMainBinding binding;
     private MainViewModel viewModel;
     private ExpenseAdapter adapter;
+    private static final String BUDGET_ALERT_CHANNEL_ID = "budget_alert_channel";
+    private static final int NOTIFICATION_ID = 1001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+
+        // Set up toolbar
         setSupportActionBar(binding.toolbar);
+        getSupportActionBar().setTitle("Expense Tracker");
 
         viewModel = new ViewModelProvider(this).get(MainViewModel.class);
         setupRecyclerView();
@@ -83,7 +99,17 @@ public class MainActivity extends AppCompatActivity implements ExpenseAdapter.On
 
         // Show warning if over budget
         if (totalExpense > budget) {
-            // Implement budget warning notification
+            showBudgetAlert(totalExpense, budget);
+            binding.budgetProgressBar.setProgressTintList(
+                ColorStateList.valueOf(getColor(R.color.design_default_color_error)));
+        } else {
+            binding.budgetProgressBar.setProgressTintList(
+                ColorStateList.valueOf(getColor(R.color.design_default_color_primary)));
+        }
+
+        // Show warning when approaching budget (90%)
+        if (totalExpense >= budget * 0.9 && totalExpense <= budget) {
+            showBudgetWarning(totalExpense, budget);
         }
     }
 
@@ -132,16 +158,105 @@ public class MainActivity extends AppCompatActivity implements ExpenseAdapter.On
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_logout) {
+        int id = item.getItemId();
+        
+        if (id == R.id.action_set_budget) {
+            showBudgetDialog();
+            return true;
+        }
+        else if (id == R.id.action_settings) {
+            startActivity(new Intent(this, SettingsActivity.class));
+            return true;
+        }
+        else if (id == R.id.action_logout) {
             FirebaseAuth.getInstance().signOut();
             startActivity(new Intent(this, LoginActivity.class));
             finish();
             return true;
         }
-        if (item.getItemId() == R.id.action_settings) {
-            startActivity(new Intent(this, SettingsActivity.class));
-            return true;
-        }
+
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showBudgetDialog() {
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
+        View view = getLayoutInflater().inflate(R.layout.dialog_set_budget, null);
+        TextInputEditText budgetInput = view.findViewById(R.id.budgetEditText);
+        
+        builder.setTitle("Set Monthly Budget")
+               .setView(view)
+               .setPositiveButton("Save", (dialog, which) -> {
+                   String budgetStr = budgetInput.getText().toString();
+                   if (!budgetStr.isEmpty()) {
+                       double budget = Double.parseDouble(budgetStr);
+                       viewModel.setMonthlyBudget(budget);
+                   }
+               })
+               .setNegativeButton("Cancel", null)
+               .show();
+    }
+
+    private void showBudgetAlert(double totalExpense, double budget) {
+        String title = "Budget Exceeded!";
+        String message = String.format(Locale.getDefault(),
+            "You've exceeded your monthly budget of $%.2f by $%.2f",
+            budget, totalExpense - budget);
+
+        // Show in-app alert
+        new MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("View Budget", (dialog, which) -> {
+                showBudgetDialog();
+            })
+            .setNegativeButton("Dismiss", null)
+            .show();
+
+        // Show notification
+        showNotification(title, message);
+    }
+
+    private void showBudgetWarning(double totalExpense, double budget) {
+        String title = "Budget Warning";
+        String message = String.format(Locale.getDefault(),
+            "You're approaching your monthly budget. Used: $%.2f of $%.2f (%.1f%%)",
+            totalExpense, budget, (totalExpense/budget) * 100);
+
+        showNotification(title, message);
+    }
+
+    private void showNotification(String title, String message) {
+        NotificationManager notificationManager = 
+            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        // Create notification channel for Android O and above
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                BUDGET_ALERT_CHANNEL_ID,
+                "Budget Alerts",
+                NotificationManager.IMPORTANCE_DEFAULT
+            );
+            channel.setDescription("Alerts for budget limits");
+            notificationManager.createNotificationChannel(channel);
+        }
+
+        // Create an intent for when notification is tapped
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent,
+            PendingIntent.FLAG_IMMUTABLE);
+
+        // Build the notification
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, BUDGET_ALERT_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent);
+
+        // Show the notification
+        notificationManager.notify(NOTIFICATION_ID, builder.build());
     }
 } 

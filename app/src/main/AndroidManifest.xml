@@ -27,7 +27,9 @@
         <activity android:name=".ui.auth.RegisterActivity" />
         <activity android:name=".ui.main.MainActivity" />
         <activity android:name=".ui.expense.AddExpenseActivity" />
-        <activity android:name=".ui.expense.EditExpenseActivity" />
+        <activity
+            android:name=".ui.expense.EditExpenseActivity"
+            android:parentActivityName=".ui.main.MainActivity"/>
         <activity android:name=".ui.settings.SettingsActivity" />
         
         <service

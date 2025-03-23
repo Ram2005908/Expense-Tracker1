@@ -7,6 +7,7 @@ import android.content.Intent;
 
 import androidx.core.app.NotificationCompat;
 
+import com.example.expensetracker.ExpenseTrackerApp;
 import com.example.expensetracker.R;
 import com.example.expensetracker.ui.main.MainActivity;
 import com.google.firebase.messaging.FirebaseMessagingService;

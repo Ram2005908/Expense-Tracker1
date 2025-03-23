@@ -3,12 +3,11 @@ package com.example.expensetracker.adapter;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.expensetracker.R;
+import com.example.expensetracker.databinding.ItemExpenseBinding;
 import com.example.expensetracker.model.Expense;
 
 import java.text.SimpleDateFormat;
@@ -18,8 +17,8 @@ import java.util.Locale;
 
 public class ExpenseAdapter extends RecyclerView.Adapter<ExpenseAdapter.ExpenseViewHolder> {
     private List<Expense> expenses = new ArrayList<>();
-    private OnExpenseClickListener listener;
-    private SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+    private final OnExpenseClickListener listener;
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
 
     public interface OnExpenseClickListener {
         void onExpenseClick(Expense expense);
@@ -32,15 +31,14 @@ public class ExpenseAdapter extends RecyclerView.Adapter<ExpenseAdapter.ExpenseV
     @NonNull
     @Override
     public ExpenseViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_expense, parent, false);
-        return new ExpenseViewHolder(view);
+        ItemExpenseBinding binding = ItemExpenseBinding.inflate(
+            LayoutInflater.from(parent.getContext()), parent, false);
+        return new ExpenseViewHolder(binding);
     }
 
     @Override
     public void onBindViewHolder(@NonNull ExpenseViewHolder holder, int position) {
-        Expense expense = expenses.get(position);
-        holder.bind(expense);
+        holder.bind(expenses.get(position));
     }
 
     @Override
@@ -54,18 +52,12 @@ public class ExpenseAdapter extends RecyclerView.Adapter<ExpenseAdapter.ExpenseV
     }
 
     class ExpenseViewHolder extends RecyclerView.ViewHolder {
-        private TextView amountText;
-        private TextView categoryText;
-        private TextView dateText;
-        private TextView descriptionText;
+        private final ItemExpenseBinding binding;
 
-        public ExpenseViewHolder(@NonNull View itemView) {
-            super(itemView);
-            amountText = itemView.findViewById(R.id.expenseAmount);
-            categoryText = itemView.findViewById(R.id.expenseCategory);
-            dateText = itemView.findViewById(R.id.expenseDate);
-            descriptionText = itemView.findViewById(R.id.expenseDescription);
-
+        ExpenseViewHolder(ItemExpenseBinding binding) {
+            super(binding.getRoot());
+            this.binding = binding;
+            
             itemView.setOnClickListener(v -> {
                 int position = getAdapterPosition();
                 if (position != RecyclerView.NO_POSITION) {
@@ -74,11 +66,11 @@ public class ExpenseAdapter extends RecyclerView.Adapter<ExpenseAdapter.ExpenseV
             });
         }
 
-        public void bind(Expense expense) {
-            amountText.setText(String.format("$%.2f", expense.getAmount()));
-            categoryText.setText(expense.getCategory());
-            dateText.setText(dateFormat.format(expense.getDate()));
-            descriptionText.setText(expense.getDescription());
+        void bind(Expense expense) {
+            binding.descriptionText.setText(expense.getDescription());
+            binding.categoryText.setText(expense.getCategory());
+            binding.dateText.setText(dateFormat.format(expense.getDate()));
+            binding.amountText.setText(String.format("$%.2f", expense.getAmount()));
         }
     }
 } 

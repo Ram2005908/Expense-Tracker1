@@ -10,7 +10,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.expensetracker.databinding.ActivityLoginBinding;
 import com.example.expensetracker.ui.main.MainActivity;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException;
+import com.google.firebase.auth.FirebaseAuthInvalidUserException;
 
 public class LoginActivity extends AppCompatActivity {
     private ActivityLoginBinding binding;
@@ -24,9 +25,9 @@ public class LoginActivity extends AppCompatActivity {
 
         auth = FirebaseAuth.getInstance();
 
-        // Check if user is already logged in
+        // Check if user is already signed in
         if (auth.getCurrentUser() != null) {
-            startMainActivity();
+            startActivity(new Intent(this, MainActivity.class));
             finish();
             return;
         }
@@ -35,39 +36,43 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void setupClickListeners() {
-        binding.loginButton.setOnClickListener(v -> performLogin());
-        binding.registerButton.setOnClickListener(v -> {
-            startActivity(new Intent(this, RegisterActivity.class));
-        });
+        binding.loginButton.setOnClickListener(v -> loginUser());
+        binding.registerLink.setOnClickListener(v -> 
+            startActivity(new Intent(this, RegisterActivity.class)));
     }
 
-    private void performLogin() {
+    private void loginUser() {
         String email = binding.emailEditText.getText().toString().trim();
         String password = binding.passwordEditText.getText().toString().trim();
 
         if (email.isEmpty() || password.isEmpty()) {
-            Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show();
             return;
         }
 
         binding.progressBar.setVisibility(View.VISIBLE);
-        
+        binding.loginButton.setEnabled(false);
+
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this, task -> {
                 binding.progressBar.setVisibility(View.GONE);
+                binding.loginButton.setEnabled(true);
+
                 if (task.isSuccessful()) {
-                    startMainActivity();
+                    startActivity(new Intent(LoginActivity.this, MainActivity.class));
                     finish();
                 } else {
-                    Toast.makeText(this, "Authentication failed: " + 
-                        task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                    String message = "Authentication failed";
+                    Exception exception = task.getException();
+                    
+                    if (exception instanceof FirebaseAuthInvalidUserException) {
+                        message = "No account found with this email";
+                    } else if (exception instanceof FirebaseAuthInvalidCredentialsException) {
+                        message = "Invalid email or password";
+                    }
+                    
+                    Toast.makeText(LoginActivity.this, message, Toast.LENGTH_LONG).show();
                 }
             });
-    }
-
-    private void startMainActivity() {
-        Intent intent = new Intent(this, MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
     }
 } 

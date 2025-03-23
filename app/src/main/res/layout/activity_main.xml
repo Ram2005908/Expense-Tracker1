@@ -14,7 +14,8 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/colorPrimary"
-            android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"/>
+            android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
+            app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light"/>
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -45,49 +46,22 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Monthly Budget"
-                        android:textAppearance="?attr/textAppearanceHeadline6"/>
-
-                    <TextView
-                        android:id="@+id/budgetAmountText"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:textAppearance="?attr/textAppearanceHeadline5"/>
+                        android:textAppearance="?attr/textAppearanceSubtitle1"/>
 
                     <ProgressBar
                         android:id="@+id/budgetProgressBar"
                         style="@style/Widget.AppCompat.ProgressBar.Horizontal"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"/>
-
-                </LinearLayout>
-
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- Recent Expenses Card -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                        android:layout_marginTop="8dp"
+                        android:max="100"/>
 
                     <TextView
+                        android:id="@+id/budgetAmountText"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Recent Expenses"
-                        android:textAppearance="?attr/textAppearanceHeadline6"/>
-
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/recentExpensesRecyclerView"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"/>
+                        android:layout_marginTop="4dp"
+                        android:textAppearance="?attr/textAppearanceCaption"/>
 
                 </LinearLayout>
 
@@ -113,12 +87,26 @@
                     <com.github.mikephil.charting.charts.PieChart
                         android:id="@+id/expenseChart"
                         android:layout_width="match_parent"
-                        android:layout_height="300dp"
-                        android:layout_marginTop="8dp"/>
+                        android:layout_height="200dp"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="16dp"/>
 
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
+
+            <!-- Recent Expenses Card -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Recent Expenses"
+                android:textAppearance="?attr/textAppearanceSubtitle1"
+                android:layout_marginBottom="8dp"/>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recentExpensesRecyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"/>
 
         </LinearLayout>
 
